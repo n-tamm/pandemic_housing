@@ -367,33 +367,44 @@ In the following visualizations, we will visualize the data from the Federal Res
 ### Plot 1
 
 ```{r}
+average <- round(mean(mortgage_ir$mortgage_ir_30year), 2)
+
 mortgage_ir %>%
   ggplot() +
   aes(
     x = date,
-    y = mortgage_ir_30year
+    y = mortgage_ir_30year,
   ) +
   geom_line() +
+  geom_hline(yintercept = mean(mortgage_ir$mortgage_ir_30year), color='blue', lty='dashed', lwd=1) +
+  geom_text(aes(x = lubridate::ymd('2020/01/01'), average, label = average, vjust = - 1, hjust = 5)) +
   labs(
     x = 'Date',
     y = 'Mortgage Rate - 30y fixed',
     title = '30-year Fixed Mortage Rates 1971-2022',
     caption = 'Source: Federal Reserve Bank of St. Louis (FRED)'
   )
+
 ```
 
 ### Plot 2
 ```{r}
-mortgage_ir %>%
+mortgage_ir_2 <- mortgage_ir %>%
   filter(
     date >= '2020-01-30'
-  ) %>%
+  ) 
+
+average <- round(mean(mortgage_ir_2$mortgage_ir_30year), 2)
+
+mortgage_ir_2 %>%
   ggplot() +
   aes(
     x = date,
     y = mortgage_ir_30year
   ) +
   geom_line() +
+  geom_hline(yintercept = average, color='blue', lty='dashed', lwd=1) +
+  geom_text(aes(x = lubridate::ymd('2020/01/01'), average, label = average, vjust = - 1, hjust = -7)) +
   labs(
     x = 'Date',
     y = 'Mortgage Rate - 30y fixed',
@@ -492,7 +503,7 @@ budget_changes
 ```
 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 mortgage_percent_wages <- pandemic_housing_final %>%
   select(state_name, 
          mortgage_percent_of_wages_jan, 
@@ -500,15 +511,23 @@ mortgage_percent_wages <- pandemic_housing_final %>%
          budget_change_as_percentage_of_wages) %>%
   arrange(desc(budget_change_as_percentage_of_wages))
 
-reactable(mortgage_percent_wages, searchable = TRUE, showPageSizeOptions = TRUE, pageSizeOptions = c(5, 10, 15, 25), defaultPageSize = 5,
-          paginationType = "jump",
+
+orange_pal <- function(x) rgb(colorRamp(c("#7fb7d7", "#ffffbf", "#fc8d59"))(x), maxColorValue = 255)
+
+reactable(mortgage_percent_wages, searchable = TRUE, showPageSizeOptions = TRUE, pageSizeOptions = c(5, 10, 15, 20, 25, 50), defaultPageSize = 5,
+          paginationType = "jump", compact = TRUE,
           columns = list(
-            State = colDef(name = "Abbrv."),
-            state_name = colDef(name = "State"),
-            mortgage_percent_of_wages_jan = colDef(name = "% of Wages Jan", format = colFormat(digits = 2)),
-            mortgage_percent_of_wages_mar = colDef(name = "% of Wages Mar", format = colFormat(digits = 2)),
-            budget_change_as_percentage_of_wages = colDef(name = "Budget Change %", format = colFormat(digits = 2))
-  ))
+            State = colDef(name = "Abbrv.", resizable = TRUE),
+            state_name = colDef(name = "State", resizable = TRUE),
+            mortgage_percent_of_wages_jan = colDef(name = "% of Wages Jan", format = colFormat(digits = 2), resizable = TRUE),
+            mortgage_percent_of_wages_mar = colDef(name = "% of Wages Mar", format = colFormat(digits = 2), resizable = TRUE),
+            budget_change_as_percentage_of_wages = colDef(name = "Budget Change %", format = colFormat(digits = 2), resizable = TRUE,
+                                                          style = function(value) {
+      normalized <- (value - min(mortgage_percent_wages$budget_change_as_percentage_of_wages)) / (max(mortgage_percent_wages$budget_change_as_percentage_of_wages) - min(mortgage_percent_wages$budget_change_as_percentage_of_wages))
+      color <- orange_pal(normalized)
+      list(background = color)
+    }
+  )))
 ```
 
 
