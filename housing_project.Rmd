@@ -2,11 +2,17 @@
 title: "An Analysis of Home Values & Mortgage Budgeting"
 author: "Noah Tamminga"
 date: "April 2022"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    toc_levels: 2
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, size = "small")
 
 options(scipen = 999)
 ```
@@ -18,6 +24,7 @@ options(scipen = 999)
 #install.packages('tigris')
 #install.packages('FinCal')
 #install.packages('reactable')
+#install.packages('viridisLite')
 
 
 library(tidyverse)
@@ -29,25 +36,29 @@ library(robotstxt)
 library(tigris)
 library(FinCal)
 library(reactable)
+library(viridisLite)
+library(viridis)
+library(tidyjson)
+library(jsonlite)
 
-#https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html
+
 ```
 
 
-## Project Introduction
+# Project Introduction
 
-For this project, I will focus on exploratory data analysis on data related to the housing market. Because my current organization is partially tied to the overall housing market, it would help to gain an understanding of historical price changes, transactions, in-demand geographical areas, and other factors. The housing market is a broad industry to analyze as it can include factors such as prices, price changes, in-demand locations, inflation, interest rates, wages, and a multitude of other factors. The goal of this analysis will be to first understand price levels and price changes across the United States. Following this, additional analyses can be added and new datasets joined to further the analysis in new directions based on interests or discoveries in the wrangling process. 
+For this project, I will focus on an exploratory data analysis of data related to the housing market. Because this topic has implications across many industries and personal lives, it would help to gain an understanding of historical price changes, transactions, in-demand geographical areas, and other factors. The housing market is a broad industry to analyze as it can include factors such as prices, price changes, in-demand locations, inflation, interest rates, wages, and a multitude of other factors. The goal of this analysis will be to first understand price levels and price changes across the United States. Following this, additional analyses can be added and new datasets joined to further the analysis in new directions based on interests or discoveries in the wrangling process. 
 
 Data for this project will come from [Zillow](https://www.zillow.com/research/data/) which includes a large variety of historical data based on different housing features, adjustments, and other information. Additionally, *if possible* and *reasonable*, extending this analysis by working with [Zillow's API](https://www.zillow.com/howto/api/APIOverview.htm) might be a helpful tool to access data in another format besides their collection of historical csv files. The datasets from Zillow include multiple areas of interest including home value, forecasts, home inventory, home transactions, and price changes. All these different tables are primarily in wide-format and can be downloaded based on a variety of different combinations of calculation adjustments and geographical specifications.
 
 **Goal**: For this project, the primary goal will be to understand how housing prices have changed proportionally in different states in the United States. Because different costs of living and overall varying asset values must be adjusted for, the analysis will focus on percentage changes in prices rather than nominal values. First, we will gain an understanding of the current nationwide picture of percentage changes in home prices based on each state. With this understanding, we can explore different aspects such as housing demand through housing inventory changes. Additionally, we can explore housing budget changes that reflect current housing payments as a proportion of income based on current mortgage interest rates. Data for housing inventory comes from [Zillow](https://www.zillow.com/research/data/), data for wages is scraped from the [BLS](https://www.bls.gov/charts/county-employment-and-wages/percent-change-aww-by-state.htm/), and data for interest rates comes from [FRED](https://fred.stlouisfed.org/series/MORTGAGE30US).
 
 
-## Data Collection
+# Data Collection
 
 For this project, I will primarily be utilizing historical housing data from Zillow. To aid in reproducibility, the dataset used below can be found on Zillow's data archive: [Zillow](https://www.zillow.com/research/data/). The specific dataset in use can be obtained by going to the *Home Values* section of the webpage and selecting the seasonally adjusted and zipcode parameters for the required inputs to download the csv file. Once downloaded, the correct csv file should have the equivalent name as the dataset read in below. However, as additional months are added to Zillow's archives, this csv file will grow to include more recent data. The dataset I will be using includes home prices based on zipcodes up until March 31, 2022.
 
-Additionally, below in the countrywide analysis section, we utilize geometric shape data to create an accurate visualization of the United States. This dataset can be found here: [National Weather Service](https://www.weather.gov/gis/USStates).
+Additionally, below in the countrywide analysis section, I utilize geometric shape data to create an accurate visualization of the United States. This dataset can be found here: [National Weather Service](https://www.weather.gov/gis/USStates).
 
 ```{r}
 housing_data <- read_csv("data/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv")
@@ -76,7 +87,7 @@ head(housing_data_longer)
 
 
 
-## Countrywide Analysis
+# Countrywide Analysis
 
 For this analysis, we will see the current average price level for each state. Following this, we will look at which states have seen the largest rise in home values since the beginning of the pandemic (January 2020 - March 2022).
 
@@ -111,6 +122,7 @@ Next, we will read in the shape file and join it to the `pandemic_housing` datas
 ```{r}
 state_shapes <- st_read('data/s_22mr22/s_22mr22.shp')
 
+# shift_geometry (from tigris) adjusts the geographical location of Alaska and Hawaii
 state_shapes <- state_shapes %>% 
   shift_geometry()
 
@@ -120,12 +132,12 @@ housing_merged_state_pandemic <- state_shapes %>%
 
 ```
 
-### State Plotting
+## State Plotting
 
 
 ```{r}
 pandemic_changes <- ggplot(data = housing_merged_state_pandemic, 
-             aes(fill = percent_change)) +
+  aes(fill = percent_change)) +
   geom_sf() +
   xlim(-125, -65) +
   ylim(20, 50) +
@@ -135,7 +147,8 @@ pandemic_changes <- ggplot(data = housing_merged_state_pandemic,
     caption = 'Source: Zillow.com'
   ) +
   theme_void() +
-  scale_fill_viridis_c(option = 'B', direction = -1)
+  scale_fill_viridis(option = 'B', direction = -1) 
+  #scale_fill_binned(type = "viridis", option = 'c')
 
 pandemic_changes
 
@@ -143,9 +156,9 @@ pandemic_changes
 
 
 
-## Housing Inventories
+# Housing Inventories
 
-Next we will look at how housing inventories have changed over the same pandemic time period. The goal of this analysis is to visualize any changes in inventory which can potentially be used to explain at least part of the changes in prices seen above. The data used for this analysis can be found on Zillow's archive under the inventory section: [Zillow](https://www.zillow.com/research/data/). To download the dataset choose the option of, "For-Sales Inventory (Smooth, All Homes, Monthly)". This dataset provides the count of unique listings that were active at any time in a given month.
+Next we will look at how housing inventories have changed over the same pandemic time period. The goal of this analysis is to visualize any changes in inventory which can potentially be used to explain at least part of the changes in prices seen above (lower inventroy leading to higher demand due to scarcity). The data used for this analysis can be found on Zillow's archive under the inventory section: [Zillow](https://www.zillow.com/research/data/). To download the dataset choose the option of, "For-Sales Inventory (Smooth, All Homes, Monthly)". This dataset provides the count of unique listings that were active at any time in a given month.
 
 The following code chunks will adjust the data in the same manner explained above for the `pandemic_housing` dataset.
 
@@ -164,11 +177,13 @@ inventory_longer <- inventory %>%
   )
 
 inventory_longer <- inventory_longer %>%
-  filter(is.na(StateName) == FALSE)
+  filter(is.na(StateName) == FALSE) %>%
+  filter(is.na(inventory_level) == FALSE)
 
 inventory_longer$Date <- lubridate::ymd(inventory_longer$Date)
 
 head(inventory_longer)
+
 ```
 
 
@@ -198,9 +213,9 @@ pandemic_inventory
 
 
 
-### Inventory Plotting
+## Inventory Plotting
 
-In the plot below, we can see the visual representation of the data above. While two states are missing monthly averages, we can see that every state experienced a decline in home inventory levels during the pandemic. Interestingly, we can see that some of the states that experienced high percentage changes in price (such as Washington, California, and Arizona) had lower inventory changes overall compared to other states. However, we can see that the opposite is true for some states in the Northeast or Southeast. 
+In the plot below, we can see the visual representation of the data above. While two states are missing monthly averages, we can see that every state experienced a decline in home inventory levels during the pandemic. Interestingly, we can see that some of the states that experienced high percentage changes in price (such as Washington, California, and Arizona - seen above) had lower inventory changes overall compared to other states. However, we can see that the opposite is true for some states in the Northeast or Southeast. 
 
 
 ```{r}
@@ -220,18 +235,18 @@ inventory_changes_pandemic <- inventory_merged_pandemic %>%
     caption = 'Source: Zillow.com'
   ) +
   theme_void() +
-  scale_fill_viridis_c(option = 'A')
+  scale_fill_viridis_c(option = 'B')
 
 inventory_changes_pandemic
 ```
 
 
 
-## Current Wages
+# Current Wages
 
-Next, to progress our analysis to the final goal of understanding changes in household budgets, we scrape average wages for each state in the US, clean the data, and adjust the data to produce an average annual income for each state.
+Next, to progress our analysis to the final goal of understanding changes in household budgets, we scrape average wages for each state in the U.S., clean the data, and adjust the data to produce an average annual income for each state.
 
-The following code chunk can be used to scrap wage data from the BLS website. However to ensure this analysis is not affected by any changes in the BLS website, the data has been stored as a csv and read in as a csv file. 
+The following code chunk can be used to scrape wage data from the BLS website. However to ensure this analysis is not affected by any changes in the BLS website, the data has been stored as a csv and read in as a csv file. 
 
 ```{r}
 # paths_allowed("https://www.bls.gov/charts/county-employment-and-wages/percent-change-aww-by-state.htm/")
@@ -294,15 +309,41 @@ wages <- wages %>%
     annual_2021_wages = (september_2021_avg_weekly_wages_dollars*52)
   )
 
+wages <- wages %>%
+  mutate(
+    state_abb = state.abb[match(State, state.name)]
+  )
+
 head(wages)
 
 ```
 
 
 
+```{r}
+wages_merged_pandemic <- state_shapes %>%
+  st_transform(4326) %>%
+  inner_join(wages, by = c("STATE" = "state_abb"))
+
+wages_changes_pandemic <- wages_merged_pandemic %>%
+  ggplot() + 
+  aes(fill = percent_change) +
+  geom_sf() +
+  xlim(-125, -65) +
+  ylim(20, 50) +
+  labs(
+    fill = 'Percentage Change',
+    title = 'Percentage Change in Wages 01/31/2020 - 03/31/2022',
+    caption = 'Source: Bureau of Labor Statistics'
+  ) +
+  theme_void() +
+  scale_fill_viridis(option = 'B', direction = -1) 
+
+wages_changes_pandemic
+```
 
 
-## Mortgage Interest Rates
+# Mortgage Interest Rates
 
 Next, we will look at mortgage interest rate fluctuation. Specifically, we will look at how rates have changed over the past two years during the pandemic. Following this, in the next section we will compute an average mortgage budget change from January 2020 - March 2022 based on current average home values, wages, and mortgage interest rates.
 
@@ -319,11 +360,11 @@ mortgage_ir <- mortgage_ir %>%
 head(mortgage_ir)
 ```
 
-### Interest Rate Visualizations
+## Interest Rate Visualizations
 
-Next, we will visualize the data from the Federal Reserve in plot #1 to gain an understanding of how mortgage rates have changed since the early 1970s to now. Additionally, in plot #2, we visualize how mortgage rates have changed recently since the beginning of the pandemic.
+In the following visualizations, we will visualize the data from the Federal Reserve in plot #1 to gain an understanding of how mortgage rates have changed since the early 1970s to now. Additionally, in plot #2, we visualize how mortgage rates have changed recently since the beginning of the pandemic.
 
-#### Plot 1
+### Plot 1
 
 ```{r}
 mortgage_ir %>%
@@ -341,7 +382,7 @@ mortgage_ir %>%
   )
 ```
 
-#### Plot 2
+### Plot 2
 ```{r}
 mortgage_ir %>%
   filter(
@@ -364,7 +405,7 @@ mortgage_ir %>%
 We can see above in plot 1 that while mortgage rates have spiked recently as the FED has raised interest rates to counteract inflation, compared to historical rates since the early 1970s, the current interest rate environment is certainly not extreme. However, it is important to understand that this data is highly contextualized. Because of this, we know that although current rates are objectively low compared to historical rates, nonetheless, people are accustomed to lower rates. This acclimation to a lower interest rate environment likely influences buying behaviors. Therefore, to gain an accurate understanding of how current consumers feel about the change, it is more helpful to narrow our window to the past couple years. In the next section, we will compute the expected mortgage budget change in dollar terms and as a percentage of wages. This will allow us to perceive a more accurate depiction of the current situation that places more importance on current factors such as personal budgeting and purchasing behaviors in the current economic environment.
 
 
-## Current Mortgage Budget Analysis
+# Current Mortgage Budget Analysis
 
 To perform the following budget analysis, we will take the `pandemic_housing`, `wages`, and `mortgage_ir` datasets and use the wrangled data to compute expected changes in mortgage payments for each state based on housing prices, annual wages, and mortgage interest rates. For simplicity, we assume that the "average" buyer as indicated by the average price will put up 20% of the home value as a down payment to avoid paying mortgage insurance. We also assume that the remaining 80% of the home value will be covered by a mortgage loan. Because of these assumptions, we can reasonably state that our conclusions will reflect best case scenarios. To take this analysis further, we can later incorporate average down payment percentages and mortgage insurance rates to derive an even more accurate budget analysis.
 
@@ -375,15 +416,15 @@ To start, we will make some minor adjustments to the three datasets. Following t
 ```{r}
 pandemic_housing <- pandemic_housing %>%
   mutate(
-    avg_mortgage_jan = (avg_value_jan*0.8),
-    avg_mortgage_mar = (avg_value_mar*0.8)
+    avg_mortgage_loan_jan = (avg_value_jan*0.8),
+    avg_mortgage_loan_mar = (avg_value_mar*0.8)
   )
 
 mortgage_ir_pandemic <- mortgage_ir %>%
   filter(date >= '2020-01-30'&
          date <= '2022-03-31')
 
-# In order to join interest rates to Zillow data, we need to add a value for January 31 because the FRED data skips that date.
+# In order to join interest rates to Zillow data, we need to add a value for January 31 because the FRED data skips that date. The added value is the same as the prior date (January 30, 2020)
 mortgage_ir_pandemic <- mortgage_ir_pandemic %>%
   add_row(date = lubridate::ymd('2020-01-31'), mortgage_ir_30year = 3.51) %>%
   arrange(date)
@@ -404,7 +445,7 @@ pandemic_housing_final <- pandemic_housing_final %>%
 
 pandemic_housing_final <- pandemic_housing_final %>%
   mutate(
-    state_name = state.name[match(State, state.abb)]
+    state_name = state.name[match(State, state.abb)] # This is internal to R
   ) %>%
   filter(State != "DC")
 
@@ -413,8 +454,8 @@ pandemic_housing_final <- pandemic_housing_final %>%
 
 pandemic_housing_final <- pandemic_housing_final %>%
   mutate(
-    monthly_payment_jan = pmt((jan_rate/100)/12, 30*12, avg_mortgage_jan, 0),
-    monthly_payment_mar = pmt((mar_rate/100)/12, 30*12, avg_mortgage_mar, 0),
+    monthly_payment_jan = pmt((jan_rate/100)/12, 30*12, avg_mortgage_loan_jan, 0),
+    monthly_payment_mar = pmt((mar_rate/100)/12, 30*12, avg_mortgage_loan_mar, 0),
     payment_difference = monthly_payment_jan - monthly_payment_mar,
     mortgage_percent_of_wages_jan = ((abs(monthly_payment_jan)*12)/annual_2020_wages)*100,
     mortgage_percent_of_wages_mar = ((abs(monthly_payment_mar)*12)/annual_2021_wages)*100,
@@ -425,7 +466,7 @@ pandemic_housing_final
 ```
 
 
-### Visualization of Mortgage Payment Changes
+## Visualization & Analysis of Mortgage Payment Changes
 
 
 ```{r}
@@ -445,7 +486,7 @@ budget_changes <- pandemic_housing_final_shape %>%
     caption = 'Sources: Zillow.com, BLS, FRED'
   ) +
   theme_void() +
-  scale_fill_viridis_c(option = 'C')
+  scale_fill_viridis_c(option = 'B', direction = -1)
 
 budget_changes
 ```
@@ -459,15 +500,34 @@ mortgage_percent_wages <- pandemic_housing_final %>%
          budget_change_as_percentage_of_wages) %>%
   arrange(desc(budget_change_as_percentage_of_wages))
 
-reactable(mortgage_percent_wages)
+reactable(mortgage_percent_wages, searchable = TRUE, showPageSizeOptions = TRUE, pageSizeOptions = c(5, 10, 15, 25), defaultPageSize = 5,
+          paginationType = "jump",
+          columns = list(
+            State = colDef(name = "Abbrv."),
+            state_name = colDef(name = "State"),
+            mortgage_percent_of_wages_jan = colDef(name = "% of Wages Jan", format = colFormat(digits = 2)),
+            mortgage_percent_of_wages_mar = colDef(name = "% of Wages Mar", format = colFormat(digits = 2)),
+            budget_change_as_percentage_of_wages = colDef(name = "Budget Change %", format = colFormat(digits = 2))
+  ))
 ```
 
 
 In regards to mortgage budgeting, we can see that the average wage and mortgage in each state experienced an increase in the percentage of wages needed to cover mortgage payments. However, we can see that some states experienced changes in excess of 10%, while many others only saw a less than 5% increase. Essentially, what we can distill from this data is that new home owners with a mortgage in the United States have to budget more of their wages to cover their mortgage payments. Based on the data above, this change in budgeting is due at least in part due to rising home prices, higher interest rates, and wage changes that do not keep pace with prices and interest rates. Some conclusions we can draw from this analysis are that home owners should wait to purchase a home until they are more financially secure or interest rates fall. Additionally, when considering where to live, prospective home buyers might want to consider the cost of living as evident by mortgage payments as a percentage of their wages.
 
 
+# Appendix
 
+```{r}
+# This code chunk exports various tables used in this analysis for other applications such as Tableau
 
+write_csv(housing_data, 'exported_data/housing_data.csv')
+write_csv(housing_data_longer, 'exported_data/housing_data_longer.csv')
+write_csv(wages, 'exported_data/wages.csv')
+write_csv(mortgage_ir, 'exported_data/mortgage_ir.csv')
+write_csv(pandemic_housing_final, 'exported_data/pandemic_housing_final.csv')
+write_csv(inventory_longer, 'exported_data/inventory_longer.csv')
+
+```
 
 
 
